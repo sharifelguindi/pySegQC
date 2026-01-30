@@ -1,0 +1,100 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pysegqc"
+version = "0.1.0"
+description = "Quality control and clustering analysis tool for medical image segmentation metrics"
+readme = "README.md"
+requires-python = ">=3.8,<3.13"
+license = {text = "MIT"}
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+keywords = ["radiomics", "clustering", "segmentation", "quality-control", "medical-imaging", "PCA"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Healthcare Industry",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+
+dependencies = [
+    "numpy>=1.21.0",
+    "pandas>=1.3.0,<3.0.0",
+    "scikit-learn>=1.0.0,<2.0.0",
+    "matplotlib>=3.4.0,<4.0.0",
+    "seaborn>=0.11.0,<1.0.0",
+    "openpyxl>=3.0.0,<4.0.0",
+    "scipy>=1.7.0,<2.0.0",
+    "plotly>=5.0.0,<6.0.0",
+    "tqdm>=4.60.0,<5.0.0",
+    "pyyaml>=5.4.0,<7.0.0",
+    "jinja2>=3.0.0,<4.0.0",
+    "joblib>=1.0.0,<2.0.0",
+    # NIfTI feature extraction dependencies (required for full functionality)
+    "nibabel>=3.0.0,<6.0.0",
+    "SimpleITK>=2.0.0,<3.0.0",
+    # pyradiomics-cuda: Drop-in replacement for pyradiomics with Python 3.12 support
+    # Works on CPU (no GPU required) - install with DISABLE_CUDA_EXTENSIONS=1
+    "pyradiomics-cuda>=1.0.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/pySegQC"
+Documentation = "https://github.com/yourusername/pySegQC/blob/main/README.md"
+Repository = "https://github.com/yourusername/pySegQC"
+"Bug Tracker" = "https://github.com/yourusername/pySegQC/issues"
+
+[project.scripts]
+pysegqc = "pysegqc.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+pysegqc = ["py.typed"]
+
+[tool.black]
+line-length = 119
+target-version = ["py38", "py39", "py310", "py311", "py312"]
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 119
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-v --cov=pysegqc --cov-report=html --cov-report=term -m 'not slow'"
+markers = [
+    "slow: marks tests as slow (real NIfTI data, run with: pytest -m slow --timeout=600)",
+]
