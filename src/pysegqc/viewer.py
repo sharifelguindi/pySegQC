@@ -195,16 +195,24 @@ _VIEWER_TEMPLATE = r'''<!DOCTYPE html>
         <button onclick="setWL(50,350)" id="wl-pelvis">Pelvis</button>
       </div>
       <div class="wl-inputs">
-        <label>L</label><input id="wl-level" type="number" value="40">
-        <label>W</label><input id="wl-width" type="number" value="80">
+        <label>L</label><input id="wl-level" type="number" value="50">
+        <label>W</label><input id="wl-width" type="number" value="350">
         <button class="wl-presets" style="margin:0;" onclick="applyCustomWL()">Apply</button>
+      </div>
+    </div>
+    <div class="wl-section">
+      <label>Zoom</label>
+      <div class="wl-presets">
+        <button onclick="zoomOut()">&#x2212;</button>
+        <button onclick="resetZoom()">1:1</button>
+        <button onclick="zoomIn()">+</button>
       </div>
     </div>
     <div id="status-msg"></div>
     <div class="help-banner">
       <strong>How to use:</strong> Serve from filesystem root, then open the viewer URL:<br>
       <code>cd / &amp;&amp; python -m http.server 8080</code><br>
-      Scroll mouse wheel to navigate slices.
+      Scroll to navigate slices. Use +/&#x2212; to zoom.
     </div>
     <div class="nav-btns">
       <button id="btn-prev" onclick="navigate(-1)">&#x25C0; Prev</button>
@@ -270,7 +278,8 @@ async function init() {
   // Initialize NiiVue — multiplanar (axial + coronal + sagittal)
   nv = new Niivue({
     backColor: [0.08, 0.08, 0.1, 1],
-    show3Dcrosshair: true,
+    show3Dcrosshair: false,
+    crosshairWidth: 0,
     multiplanarForceRender: true,
     sliceType: 3,
   });
@@ -322,7 +331,7 @@ async function loadCase(idx) {
       volumes.push({
         url: maskUrl,
         colormap: 'actc',
-        opacity: 0.5,
+        opacity: 1.0,
       });
     }
     await nv.loadVolumes(volumes);
@@ -333,8 +342,38 @@ async function loadCase(idx) {
       for (let i = 0; i < img.length; i++) {
         if (Math.round(img[i]) !== label) img[i] = 0;
       }
+    }
+    // Convert solid mask to contour (keep only boundary voxels)
+    if (nv.volumes.length > 1) {
+      const vol = nv.volumes[1];
+      const img = vol.img;
+      const nx = vol.hdr.dims[1], ny = vol.hdr.dims[2], nz = vol.hdr.dims[3];
+      if (nx * ny * nz === img.length) {
+        const src = img.slice();
+        for (let z = 0; z < nz; z++) {
+          for (let y = 0; y < ny; y++) {
+            for (let x = 0; x < nx; x++) {
+              const idx = x + y * nx + z * nx * ny;
+              if (src[idx] === 0) continue;
+              const v = src[idx];
+              const interior =
+                (x > 0 && src[idx-1] === v) &&
+                (x < nx-1 && src[idx+1] === v) &&
+                (y > 0 && src[idx-nx] === v) &&
+                (y < ny-1 && src[idx+nx] === v) &&
+                (z > 0 && src[idx-nx*ny] === v) &&
+                (z < nz-1 && src[idx+nx*ny] === v);
+              if (interior) img[idx] = 0;
+            }
+          }
+        }
+      }
       nv.updateGLVolume();
     }
+    // Preserve W/L across case navigation
+    const wlL = parseFloat(document.getElementById('wl-level').value);
+    const wlW = parseFloat(document.getElementById('wl-width').value);
+    if (!isNaN(wlL) && !isNaN(wlW)) setWL(wlL, wlW);
     statusEl.textContent = '';
   } catch (e) {
     statusEl.textContent = 'Load failed — try: cd / && python -m http.server 8080';
@@ -363,6 +402,22 @@ window.applyCustomWL = function() {
   const level = parseFloat(document.getElementById('wl-level').value);
   const width = parseFloat(document.getElementById('wl-width').value);
   if (!isNaN(level) && !isNaN(width)) setWL(level, width);
+};
+
+window.zoomIn = function() {
+  if (!nv) return;
+  nv.scene.volScaleMultiplier = (nv.scene.volScaleMultiplier || 1) * 1.4;
+  nv.drawScene();
+};
+window.zoomOut = function() {
+  if (!nv) return;
+  nv.scene.volScaleMultiplier = Math.max(0.5, (nv.scene.volScaleMultiplier || 1) / 1.4);
+  nv.drawScene();
+};
+window.resetZoom = function() {
+  if (!nv) return;
+  nv.scene.volScaleMultiplier = 1.0;
+  nv.drawScene();
 };
 
 init();

@@ -167,7 +167,23 @@ class TestGenerateViewerHtml:
         html = generate_viewer_html(output)
         assert 'sliceType: 3' in html
         assert 'multiplanarForceRender: true' in html
-        assert 'show3Dcrosshair: true' in html
+        assert 'show3Dcrosshair: false' in html
+        assert 'crosshairWidth: 0' in html
+
+    def test_html_contour_mode(self, tmp_path):
+        """Mask is converted to boundary contour via edge detection."""
+        output = tmp_path / 'viewer.html'
+        html = generate_viewer_html(output)
+        assert 'img.slice()' in html
+        assert 'interior' in html
+
+    def test_html_zoom_controls(self, tmp_path):
+        """Zoom buttons are present."""
+        output = tmp_path / 'viewer.html'
+        html = generate_viewer_html(output)
+        assert 'zoomIn' in html
+        assert 'zoomOut' in html
+        assert 'volScaleMultiplier' in html
 
 
 class TestStructureLabelSupport:
