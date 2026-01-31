@@ -165,7 +165,7 @@ class TestGenerateViewerHtml:
         """NiiVue is configured for multiplanar (all 3 planes)."""
         output = tmp_path / 'viewer.html'
         html = generate_viewer_html(output)
-        assert 'sliceType: 4' in html
+        assert 'sliceType: 3' in html
         assert 'multiplanarForceRender: true' in html
         assert 'show3Dcrosshair: true' in html
 

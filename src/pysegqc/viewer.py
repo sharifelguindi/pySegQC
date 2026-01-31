@@ -272,7 +272,7 @@ async function init() {
     backColor: [0.08, 0.08, 0.1, 1],
     show3Dcrosshair: true,
     multiplanarForceRender: true,
-    sliceType: 4,
+    sliceType: 3,
   });
   nv.attachToCanvas(document.getElementById('gl-canvas'));
 
