@@ -234,7 +234,7 @@ class TestStructureLabelSupport:
         assert 'setWL(' in html
         assert 'wl-level' in html
         assert 'wl-width' in html
-        assert 'Pelvis' in html
+        assert 'Soft Tissue' in html
         assert 'Bone' in html
         assert 'Brain' in html
         assert 'Lung' in html

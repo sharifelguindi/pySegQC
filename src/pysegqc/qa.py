@@ -129,6 +129,41 @@ def compute_qa_verdicts(
     }
 
 
+def create_neutral_qa_results(
+    pca_data: np.ndarray,
+    cluster_labels: np.ndarray,
+    centroids: np.ndarray,
+) -> Dict[str, Any]:
+    """
+    Create all-pass QA results without running outlier detection.
+
+    Used in training case selection mode where data is assumed clean,
+    so expensive Isolation Forest / z-score flagging is unnecessary.
+    The returned dict is structurally identical to compute_qa_verdicts()
+    so all downstream consumers (dashboard, export, viewer) work unchanged.
+
+    Real distance_to_centroid values are still computed — they're cheap
+    and useful for training case ranking.
+    """
+    n_samples = len(pca_data)
+    n_clusters = len(centroids)
+
+    distances = np.linalg.norm(pca_data - centroids[cluster_labels], axis=1)
+
+    logger.info("QA detection skipped (training case selection mode) — all cases marked pass")
+
+    return {
+        'verdicts': np.array(['pass'] * n_samples, dtype=object),
+        'qa_risk_scores': np.zeros(n_samples),
+        'distance_to_centroid': distances,
+        'distance_z_scores': np.zeros(n_samples),
+        'distance_outlier_mask': np.zeros(n_samples, dtype=bool),
+        'iforest_outlier_mask': np.zeros(n_samples, dtype=bool),
+        'iforest_scores': np.zeros(n_samples),
+        'per_cluster_stats': {k: {'mean': 0.0, 'std': 0.0} for k in range(n_clusters)},
+    }
+
+
 def compute_prediction_qa_verdicts(
     pca_data: np.ndarray,
     cluster_labels: np.ndarray,

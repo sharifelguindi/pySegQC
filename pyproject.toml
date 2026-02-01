@@ -53,9 +53,8 @@ dependencies = [
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
-    "black>=23.0.0",
-    "isort>=5.12.0",
-    "flake8>=6.0.0",
+    "pytest-playwright>=0.4.0",
+    "ruff>=0.4.0",
     "mypy>=1.0.0",
 ]
 
@@ -74,14 +73,33 @@ where = ["src"]
 [tool.setuptools.package-data]
 pysegqc = ["py.typed"]
 
-[tool.black]
+[tool.ruff]
 line-length = 119
-target-version = ["py38", "py39", "py310", "py311", "py312"]
-include = '\.pyi?$'
+target-version = "py38"
+src = ["src", "tests"]
 
-[tool.isort]
-profile = "black"
-line_length = 119
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (formatter handles this)
+    "SIM108", # ternary operator (readability preference)
+    "UP007",  # Optional[X] -> X | None (keep for py38 compat)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["pysegqc"]
+
+[tool.ruff.format]
+quote-style = "single"
+docstring-code-format = true
 
 [tool.mypy]
 python_version = "3.8"
@@ -94,7 +112,8 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "-v --cov=pysegqc --cov-report=html --cov-report=term -m 'not slow'"
+addopts = "-v --cov=pysegqc --cov-report=html --cov-report=term -m 'not slow and not e2e'"
 markers = [
     "slow: marks tests as slow (real NIfTI data, run with: pytest -m slow --timeout=600)",
+    "e2e: marks tests as browser e2e tests (requires playwright, run with: pytest -m e2e)",
 ]

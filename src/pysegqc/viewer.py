@@ -101,12 +101,20 @@ def generate_viewer_html(
         The HTML string (also written to output_path).
     """
     inline_json = json.dumps(viewer_data, indent=2) if viewer_data else 'null'
-    html = _VIEWER_TEMPLATE.replace('__INLINE_VIEWER_DATA__', inline_json)
     output_path = Path(output_path)
+    html = _VIEWER_TEMPLATE.replace('__INLINE_VIEWER_DATA__', inline_json)
+    html = html.replace('__OUTPUT_DIR__', str(output_path.parent.resolve()))
     output_path.write_text(html, encoding='utf-8')
     logger.info(f"NiiVue viewer saved: {output_path}")
     return html
 
+
+# ---------------------------------------------------------------------------
+# HTML template
+# ---------------------------------------------------------------------------
+# The loading spinner is implemented via a CSS pseudo-element on #status-msg
+# when the .loading class is applied, avoiding any innerHTML usage.
+# ---------------------------------------------------------------------------
 
 _VIEWER_TEMPLATE = r'''<!DOCTYPE html>
 <html lang="en">
@@ -170,8 +178,22 @@ _VIEWER_TEMPLATE = r'''<!DOCTYPE html>
     font-size:0.78rem; color:var(--muted); line-height:1.4;
   }
   .help-banner code { background:#333; padding:0.1em 0.3em; border-radius:4px; font-size:0.85em; }
+  .help-banner kbd {
+    background:#333; padding:0.1em 0.35em; border-radius:4px; font-size:0.85em;
+    border:1px solid #444; font-family:inherit;
+  }
   .case-counter { font-size:0.8rem; color:var(--muted); }
   #status-msg { font-size:0.8rem; color:var(--muted); min-height:1.2em; }
+  #status-msg.loading::before {
+    content:''; display:inline-block; width:14px; height:14px;
+    border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%;
+    animation:spin 0.6s linear infinite; vertical-align:middle; margin-right:0.4rem;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @media (max-width: 700px) {
+    .layout { flex-direction:column; }
+    .sidebar { width:100%; min-width:0; max-height:40vh; border-right:none; border-bottom:1px solid var(--border); }
+  }
 </style>
 </head>
 <body>
@@ -192,7 +214,7 @@ _VIEWER_TEMPLATE = r'''<!DOCTYPE html>
         <button onclick="setWL(40,80)" id="wl-brain">Brain</button>
         <button onclick="setWL(400,2000)" id="wl-bone">Bone</button>
         <button onclick="setWL(-600,1500)" id="wl-lung">Lung</button>
-        <button onclick="setWL(50,350)" id="wl-pelvis">Pelvis</button>
+        <button onclick="setWL(50,350)" id="wl-soft-tissue">Soft Tissue</button>
       </div>
       <div class="wl-inputs">
         <label>L</label><input id="wl-level" type="number" value="50">
@@ -210,9 +232,9 @@ _VIEWER_TEMPLATE = r'''<!DOCTYPE html>
     </div>
     <div id="status-msg"></div>
     <div class="help-banner">
-      <strong>How to use:</strong> Serve from filesystem root, then open the viewer URL:<br>
-      <code>cd / &amp;&amp; python -m http.server 8080</code><br>
-      Scroll to navigate slices. Use +/&#x2212; to zoom.
+      <strong>Keyboard:</strong> <kbd>&#x2190;</kbd><kbd>&#x2192;</kbd> navigate cases.
+      <kbd>1</kbd>&#x2013;<kbd>4</kbd> W/L presets. Scroll to change slices.<br>
+      <strong>Serve:</strong> <code>cd __OUTPUT_DIR__ &amp;&amp; python -m http.server 8080</code>
     </div>
     <div class="nav-btns">
       <button id="btn-prev" onclick="navigate(-1)">&#x25C0; Prev</button>
@@ -225,9 +247,6 @@ _VIEWER_TEMPLATE = r'''<!DOCTYPE html>
 </div>
 
 <script type="module">
-import { Niivue } from "https://unpkg.com/@niivue/niivue@0.44.0/dist/index.js";
-
-// Case data — inlined at generation time, with JSON sidecar as fallback.
 const INLINE_DATA = __INLINE_VIEWER_DATA__;
 
 let viewerData = null;
@@ -235,10 +254,27 @@ let cases = [];
 let currentIdx = 0;
 let nv = null;
 
-async function init() {
-  const statusEl = document.getElementById('status-msg');
+function setStatus(text, loading) {
+  const el = document.getElementById('status-msg');
+  el.textContent = text;
+  el.classList.toggle('loading', !!loading);
+}
 
-  // 1. Use inlined data if available, else fall back to viewer_data.json fetch
+async function init() {
+  // Load NiiVue from CDN with fallback
+  let Niivue;
+  try {
+    ({ Niivue } = await import("https://cdn.jsdelivr.net/npm/@niivue/niivue@0.44.0/dist/index.js"));
+  } catch {
+    try {
+      ({ Niivue } = await import("https://unpkg.com/@niivue/niivue@0.44.0/dist/index.js"));
+    } catch {
+      setStatus('Failed to load NiiVue library. Check your internet connection.');
+      return;
+    }
+  }
+
+  // Use inlined data if available, else fall back to viewer_data.json fetch
   if (INLINE_DATA && INLINE_DATA.cases) {
     viewerData = INLINE_DATA;
     cases = INLINE_DATA.cases;
@@ -249,14 +285,13 @@ async function init() {
       viewerData = await resp.json();
       cases = viewerData.cases || [];
     } catch (e) {
-      statusEl.textContent =
-        'Could not load case data. Serve this directory: python -m http.server 8080';
+      setStatus('Could not load case data. Serve this directory: python -m http.server 8080');
       return;
     }
   }
 
   if (cases.length === 0) {
-    statusEl.textContent = 'No cases found.';
+    setStatus('No cases found.');
     return;
   }
 
@@ -316,14 +351,13 @@ async function loadCase(idx) {
   window.location.hash = 'case=' + c.index;
 
   // Load volumes
-  const statusEl = document.getElementById('status-msg');
   const imgUrl = toVolumeUrl(c.image_path);
   if (!imgUrl) {
-    statusEl.textContent = 'No image path for this case';
+    setStatus('No image path for this case');
     return;
   }
 
-  statusEl.textContent = 'Loading volumes...';
+  setStatus('Loading volumes\u2026', true);
   try {
     const volumes = [{ url: imgUrl, colormap: 'gray' }];
     const maskUrl = toVolumeUrl(c.mask_path);
@@ -374,9 +408,9 @@ async function loadCase(idx) {
     const wlL = parseFloat(document.getElementById('wl-level').value);
     const wlW = parseFloat(document.getElementById('wl-width').value);
     if (!isNaN(wlL) && !isNaN(wlW)) setWL(wlL, wlW);
-    statusEl.textContent = '';
+    setStatus('');
   } catch (e) {
-    statusEl.textContent = 'Load failed — try: cd / && python -m http.server 8080';
+    setStatus('Load failed \u2014 serve this directory with: python -m http.server 8080');
   }
 }
 
@@ -420,7 +454,22 @@ window.resetZoom = function() {
   nv.drawScene();
 };
 
-init();
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  switch (e.key) {
+    case 'ArrowLeft':  navigate(-1); break;
+    case 'ArrowRight': navigate(1); break;
+    case '1': setWL(40, 80); break;
+    case '2': setWL(400, 2000); break;
+    case '3': setWL(-600, 1500); break;
+    case '4': setWL(50, 350); break;
+  }
+});
+
+try { await init(); } catch (e) {
+  setStatus('Viewer initialization failed: ' + e.message);
+}
 </script>
 </body>
 </html>

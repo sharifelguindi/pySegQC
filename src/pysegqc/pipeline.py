@@ -27,7 +27,7 @@ from .visualization import (
     plot_cluster_distance_heatmap,
     plot_selection_quality,
 )
-from .qa import compute_qa_verdicts
+from .qa import compute_qa_verdicts, create_neutral_qa_results
 from .report import generate_html_dashboard, generate_json_report
 from .thumbnail import generate_thumbnails_batch
 from .export import export_results
@@ -171,17 +171,21 @@ def run_analysis_pipeline(args, input_path, output_dir):
 
     # ─── QA outlier detection ───
     centroids = np.array([pca_data[cluster_labels == k].mean(axis=0) for k in range(n_clusters)])
-    qa_sigma = getattr(args, 'qa_sigma', 2.0)
-    qa_contamination = getattr(args, 'qa_contamination', 0.1)
-    qa_results = compute_qa_verdicts(
-        pca_data, cluster_labels, centroids,
-        distance_sigma=qa_sigma, iforest_contamination=qa_contamination
-    )
-    logger.info(
-        f"QA verdicts: {np.sum(qa_results['verdicts'] == 'pass')} pass, "
-        f"{np.sum(qa_results['verdicts'] == 'review')} review, "
-        f"{np.sum(qa_results['verdicts'] == 'fail')} fail"
-    )
+
+    if getattr(args, 'select_training_cases', False):
+        qa_results = create_neutral_qa_results(pca_data, cluster_labels, centroids)
+    else:
+        qa_sigma = getattr(args, 'qa_sigma', 2.0)
+        qa_contamination = getattr(args, 'qa_contamination', 0.1)
+        qa_results = compute_qa_verdicts(
+            pca_data, cluster_labels, centroids,
+            distance_sigma=qa_sigma, iforest_contamination=qa_contamination
+        )
+        logger.info(
+            f"QA verdicts: {np.sum(qa_results['verdicts'] == 'pass')} pass, "
+            f"{np.sum(qa_results['verdicts'] == 'review')} review, "
+            f"{np.sum(qa_results['verdicts'] == 'fail')} fail"
+        )
 
     # ─── Thumbnail generation (if NIfTI paths available) ───
     thumbnails = {}
@@ -311,7 +315,7 @@ def run_analysis_pipeline(args, input_path, output_dir):
         'silhouette': sil_score,
         'stability': stability_results['mean_stability'],
         'robustness': consensus_results['robustness_score'],
-        'distance_sigma': qa_sigma,
+        'distance_sigma': getattr(args, 'qa_sigma', 2.0),
     }
 
     # ─── Generate HTML dashboard ───
