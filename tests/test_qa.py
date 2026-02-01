@@ -40,7 +40,8 @@ def test_compute_qa_verdicts_returns_expected_keys(clustered_data):
     expected_keys = [
         'verdicts', 'qa_risk_scores', 'distance_to_centroid',
         'distance_z_scores', 'distance_outlier_mask',
-        'iforest_outlier_mask', 'iforest_scores', 'per_cluster_stats'
+        'iforest_outlier_mask', 'iforest_scores', 'per_cluster_stats',
+        'iforest_model',
     ]
     for key in expected_keys:
         assert key in results, f"Missing key: {key}"
@@ -179,6 +180,57 @@ def test_compute_prediction_qa_verdicts(clustered_data):
 
     assert len(pred_results['verdicts']) == 10
     assert set(pred_results['verdicts']).issubset({'pass', 'review', 'fail'})
+
+
+def test_iforest_model_returned(clustered_data):
+    """Test that compute_qa_verdicts returns the fitted IsolationForest model."""
+    data, labels, centroids = clustered_data
+    results = compute_qa_verdicts(data, labels, centroids)
+
+    assert results['iforest_model'] is not None
+    # Verify it's a fitted model that can score new samples
+    scores = results['iforest_model'].score_samples(data[:3])
+    assert len(scores) == 3
+
+
+def test_neutral_qa_returns_none_iforest():
+    """Test that create_neutral_qa_results returns iforest_model=None."""
+    from pysegqc.qa import create_neutral_qa_results
+    data = np.array([[0, 0], [1, 1], [2, 2]])
+    labels = np.array([0, 0, 1])
+    centroids = np.array([[0.5, 0.5], [2, 2]])
+
+    results = create_neutral_qa_results(data, labels, centroids)
+    assert results['iforest_model'] is None
+
+
+def test_prediction_qa_with_iforest(clustered_data):
+    """Test prediction QA uses the trained IF model for risk scoring."""
+    data, labels, centroids = clustered_data
+
+    # Get training stats and fitted IF model
+    training_results = compute_qa_verdicts(data, labels, centroids)
+    training_stats = training_results['per_cluster_stats']
+    iforest_model = training_results['iforest_model']
+
+    # Predict on subset with IF model
+    new_data = data[:10]
+    new_labels = labels[:10]
+
+    with_if = compute_prediction_qa_verdicts(
+        new_data, new_labels, centroids, training_stats,
+        trained_iforest=iforest_model,
+    )
+    without_if = compute_prediction_qa_verdicts(
+        new_data, new_labels, centroids, training_stats,
+        trained_iforest=None,
+    )
+
+    # With IF, iforest_scores should be non-zero (at least some)
+    assert not np.allclose(with_if['iforest_scores'], 0.0), \
+        "IF scores should be non-zero when model is provided"
+    assert np.allclose(without_if['iforest_scores'], 0.0), \
+        "IF scores should be zero when no model is provided"
 
 
 def test_prediction_qa_without_iforest(clustered_data):

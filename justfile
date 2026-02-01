@@ -62,6 +62,7 @@ test-file file:
 
 # Directory where test data lives and results are written
 scratch_dir := "scratch"
+serve_port := "8080"
 
 # Clear all generated results from scratch (preserves raw data)
 scratch-clean:
@@ -89,22 +90,52 @@ scratch-analyze: scratch-extract
     pysegqc analyze {{scratch_dir}}/train_features.xlsx \
         --mode concat --auto-k --volume-independent \
         --select-training-cases
+    @just auto-serve {{scratch_dir}}/train_features_clustering_results
 
 # Run analysis on existing features (skip extraction)
 scratch-analyze-only:
     pysegqc analyze {{scratch_dir}}/train_features.xlsx \
         --mode concat --auto-k --volume-independent \
         --select-training-cases
+    @just auto-serve {{scratch_dir}}/train_features_clustering_results
 
 # Run predict on test data using trained models
 scratch-predict:
     pysegqc predict {{scratch_dir}}/test/ \
         {{scratch_dir}}/train_features_clustering_results/ \
         --image-dir image --mask-dir mask
+    @just auto-serve {{scratch_dir}}/train_features_clustering_results/_nifti_prediction_features_predictions
 
-# Full scratch pipeline: clean → extract → analyze
+# Kill any existing server on the serve port
+[private]
+kill-server:
+    -lsof -ti:{{serve_port}} | xargs kill 2>/dev/null; true
+
+# Start background HTTP server and open viewer in browser
+[private]
+auto-serve results_dir:
+    @just kill-server
+    @echo "\n🌐 Starting viewer server on port {{serve_port}}..."
+    @nohup python -m http.server {{serve_port}} --directory "$(dirname {{results_dir}})" > /dev/null 2>&1 &
+    @sleep 0.5
+    @echo "   Viewer: http://localhost:{{serve_port}}/$(basename {{results_dir}})/viewer.html"
+    @open "http://localhost:{{serve_port}}/$(basename {{results_dir}})/viewer.html" 2>/dev/null || true
+
+# Serve results directory for NiiVue viewer (foreground, default: latest scratch results)
+serve results_dir=(scratch_dir + "/train_features_clustering_results"):
+    @just kill-server
+    @echo "Serving from {{results_dir}}/.. so NIfTI relative paths resolve"
+    @echo "Open http://localhost:{{serve_port}}/$(basename {{results_dir}})/viewer.html"
+    python -m http.server {{serve_port}} --directory "$(dirname {{results_dir}})"
+
+# Stop the background viewer server
+serve-stop:
+    @just kill-server
+    @echo "✓ Server stopped"
+
+# Full scratch pipeline: clean → extract → analyze → serve
 scratch-run: scratch-clean scratch-analyze
-    @echo "\n✓ Full scratch pipeline complete"
+    @echo "\n✓ Full scratch pipeline complete (viewer server running on port {{serve_port}})"
 
 # ─── Setup ─────────────────────────────────────────────────
 

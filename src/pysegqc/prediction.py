@@ -414,11 +414,13 @@ def predict_new_cases(predict_path, model_dir, sheet_name='PCA_Data', mode='all'
     qa_thresholds = trained_models.get('qa_thresholds', {})
     training_cluster_stats = qa_thresholds.get('per_cluster_stats', {})
     qa_sigma = qa_thresholds.get('distance_sigma', 2.0)
+    trained_iforest = trained_models.get('trained_iforest')
 
     qa_results = compute_prediction_qa_verdicts(
         pca_data, predicted_labels, centroids,
         training_cluster_stats=training_cluster_stats,
         distance_sigma=qa_sigma,
+        trained_iforest=trained_iforest,
     )
 
     n_pass = (qa_results['verdicts'] == 'pass').sum()

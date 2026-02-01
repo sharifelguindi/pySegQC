@@ -179,6 +179,10 @@ def export_results(metadata_df, features_df, pca_data, labels, pca_model,
                 'iforest_contamination': 0.1,
                 'per_cluster_stats': qa_results.get('per_cluster_stats', {}),
             }
+            # Save fitted Isolation Forest for prediction reuse
+            iforest_model = qa_results.get('iforest_model')
+            if iforest_model is not None:
+                trained_models['trained_iforest'] = iforest_model
 
         # Save to pickle file
         model_path = output_dir / 'trained_models.pkl'

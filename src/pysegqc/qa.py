@@ -104,6 +104,7 @@ def compute_qa_verdicts(
     iforest_results = detect_outliers(pca_data, contamination=iforest_contamination)
     iforest_outlier_mask = iforest_results['outlier_mask']
     iforest_scores = iforest_results['outlier_scores']
+    iforest_model = iforest_results.get('model')
 
     # --- Combine into verdicts ---
     verdicts = _combine_verdicts(distance_outlier_mask, iforest_outlier_mask, n_samples)
@@ -126,6 +127,7 @@ def compute_qa_verdicts(
         'iforest_outlier_mask': iforest_outlier_mask,
         'iforest_scores': iforest_scores,
         'per_cluster_stats': cluster_stats,
+        'iforest_model': iforest_model,
     }
 
 
@@ -161,6 +163,7 @@ def create_neutral_qa_results(
         'iforest_outlier_mask': np.zeros(n_samples, dtype=bool),
         'iforest_scores': np.zeros(n_samples),
         'per_cluster_stats': {k: {'mean': 0.0, 'std': 0.0} for k in range(n_clusters)},
+        'iforest_model': None,
     }
 
 

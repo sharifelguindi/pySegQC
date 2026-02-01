@@ -80,5 +80,6 @@ def detect_outliers(pca_data, contamination=0.1):
     return {
         'outlier_mask': outlier_mask,
         'outlier_scores': outlier_scores,
-        'outlier_indices': outlier_indices
+        'outlier_indices': outlier_indices,
+        'model': iso_forest,
     }

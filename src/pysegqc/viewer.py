@@ -8,6 +8,7 @@ The viewer uses NiiVue (WebGL2) for proper voxel spacing and orientation.
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -50,6 +51,7 @@ def generate_viewer_data(
     Returns:
         The data dict that was written to JSON.
     """
+    output_dir = str(Path(output_path).parent.resolve())
     cases = []
     for i in range(len(metadata_df)):
         case = {
@@ -59,15 +61,19 @@ def generate_viewer_data(
             'verdict': str(qa_results['verdicts'][i]),
             'risk_score': round(float(qa_results['qa_risk_scores'][i]), 4),
         }
-        # Add file paths if available
+        # Add file paths relative to output directory (for HTTP serving)
         if 'Image_Path' in metadata_df.columns:
             val = metadata_df.iloc[i].get('Image_Path')
             if val is not None and pd.notna(val):
-                case['image_path'] = str(Path(val).resolve())
+                case['image_path'] = os.path.relpath(
+                    str(Path(val).resolve()), str(output_dir)
+                )
         if 'Mask_Path' in metadata_df.columns:
             val = metadata_df.iloc[i].get('Mask_Path')
             if val is not None and pd.notna(val):
-                case['mask_path'] = str(Path(val).resolve())
+                case['mask_path'] = os.path.relpath(
+                    str(Path(val).resolve()), str(output_dir)
+                )
         cases.append(case)
 
     data = {'cases': cases}
@@ -102,8 +108,12 @@ def generate_viewer_html(
     """
     inline_json = json.dumps(viewer_data, indent=2) if viewer_data else 'null'
     output_path = Path(output_path)
+    resolved_dir = output_path.parent.resolve()
+    serve_dir = resolved_dir.parent  # serve from parent so relative paths resolve
+    viewer_subpath = resolved_dir.name + '/viewer.html'
     html = _VIEWER_TEMPLATE.replace('__INLINE_VIEWER_DATA__', inline_json)
-    html = html.replace('__OUTPUT_DIR__', str(output_path.parent.resolve()))
+    html = html.replace('__SERVE_DIR__', str(serve_dir))
+    html = html.replace('__VIEWER_SUBPATH__', viewer_subpath)
     output_path.write_text(html, encoding='utf-8')
     logger.info(f"NiiVue viewer saved: {output_path}")
     return html
@@ -234,7 +244,8 @@ _VIEWER_TEMPLATE = r'''<!DOCTYPE html>
     <div class="help-banner">
       <strong>Keyboard:</strong> <kbd>&#x2190;</kbd><kbd>&#x2192;</kbd> navigate cases.
       <kbd>1</kbd>&#x2013;<kbd>4</kbd> W/L presets. Scroll to change slices.<br>
-      <strong>Serve:</strong> <code>cd __OUTPUT_DIR__ &amp;&amp; python -m http.server 8080</code>
+      <strong>Serve:</strong> <code>cd __SERVE_DIR__ &amp;&amp; python -m http.server 8080</code>
+      then open <code>http://localhost:8080/__VIEWER_SUBPATH__</code>
     </div>
     <div class="nav-btns">
       <button id="btn-prev" onclick="navigate(-1)">&#x25C0; Prev</button>
