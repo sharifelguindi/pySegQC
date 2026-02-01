@@ -88,5 +88,8 @@ trained_models.pkl
 scratch/
 test_data/
 
+# Example data (may contain sensitive information)
+examples/
+
 # coding agents
 .claude/

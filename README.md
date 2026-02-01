@@ -283,7 +283,6 @@ pySegQC/
 │   ├── plotly_utils.py          # Plotly visualization utilities
 │   └── metadata_utils.py        # Metadata extraction utilities
 ├── tests/                       # 185+ unit tests
-├── examples/                    # Example data and outputs
 ├── pyproject.toml
 ├── LICENSE
 └── README.md
