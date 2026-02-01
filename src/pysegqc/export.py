@@ -15,7 +15,7 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font
 from openpyxl.utils import get_column_letter
 
-from .utils import CLUSTER_COLORS
+from .utils import CLUSTER_COLORS, extract_case_metadata
 from .visualization import plot_training_case_selection
 
 logger = logging.getLogger(__name__)
@@ -243,16 +243,6 @@ def _create_per_cluster_training_sheets(writer, training_selection_data):
         print(f"    ✓ {sheet_name}: {len(cases_df)} training cases")
 
 
-def _extract_case_metadata(case_id, metadata_df):
-    """Extract patient identifiers from metadata for a given case."""
-    result = {}
-    if metadata_df is not None and case_id in metadata_df.index:
-        for col in ('MRN', 'Plan_ID', 'Session_ID'):
-            if col in metadata_df.columns:
-                result[col] = metadata_df.loc[case_id, col]
-    return result
-
-
 def _create_training_selection_sheet(writer, training_selection_data):
     """
     Create Training_Case_Selection sheets with selection details.
@@ -293,7 +283,7 @@ def _create_training_selection_sheet(writer, training_selection_data):
         for case_id in selected_case_ids:
             details = case_details[case_id]
             case_data = {'Case_ID': case_id}
-            case_data.update(_extract_case_metadata(case_id, metadata_df))
+            case_data.update(extract_case_metadata(case_id, metadata_df, ['MRN', 'Plan_ID', 'Session_ID']))
 
             if metadata_df is not None and case_id in metadata_df.index:
                 if analysis_mode == 'position' and 'Structure_Name' in metadata_df.columns:
@@ -344,7 +334,7 @@ def _create_training_selection_sheet(writer, training_selection_data):
         for case_id in selected_case_ids:
             details = case_details[case_id]
             case_data = {'Case_ID': case_id}
-            case_data.update(_extract_case_metadata(case_id, metadata_df))
+            case_data.update(extract_case_metadata(case_id, metadata_df, ['MRN', 'Plan_ID', 'Session_ID']))
 
             if metadata_df is not None and case_id in metadata_df.index:
                 if 'All_Structure_Names' in metadata_df.columns:

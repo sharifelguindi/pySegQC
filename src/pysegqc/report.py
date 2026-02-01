@@ -20,6 +20,8 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
+from .utils import get_case_id as _get_case_id
+
 logger = logging.getLogger(__name__)
 
 
@@ -179,14 +181,6 @@ def generate_json_report(
 # HTML Dashboard
 # =============================================================================
 
-# Verdict badge colors
-_VERDICT_COLORS = {
-    'pass': '#28a745',
-    'review': '#ffc107',
-    'fail': '#dc3545',
-}
-
-
 def generate_html_dashboard(
     output_path: Path,
     metadata_df: pd.DataFrame,
@@ -270,16 +264,6 @@ def generate_html_dashboard(
 # =============================================================================
 # Dashboard Components
 # =============================================================================
-
-
-def _get_case_id(metadata_df: pd.DataFrame, index: int) -> str:
-    """Extract best available case identifier from metadata."""
-    for col in ('Case_ID', 'MRN', 'Patient_ID'):
-        if col in metadata_df.columns:
-            val = metadata_df.iloc[index].get(col)
-            if val is not None and pd.notna(val):
-                return str(val)
-    return str(metadata_df.index[index])
 
 
 def _build_qa_summary_banner(

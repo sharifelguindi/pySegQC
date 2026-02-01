@@ -1179,9 +1179,3 @@ def plot_prediction_with_training(training_pca_data, training_labels,
     logger.info(f"Saved prediction visualizations: {output_dir}")
     return figures
 
-
-# Removed: plot_interactive_3d_pca (duplicate of plot_pca_clusters 3D)
-# Removed: generate_html_dashboard (moving to report.py in Phase 5)
-# Keeping import alias for any code that references them:
-plot_interactive_3d_pca = None  # Removed — use create_pca_3d_figure()
-generate_html_dashboard = None  # Removed — use report.py

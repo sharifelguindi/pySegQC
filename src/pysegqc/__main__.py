@@ -694,18 +694,15 @@ def _predict_from_nifti(args, input_path, model_dir):
     print(f"   Image dir: {args.image_dir}")
     print(f"   Mask dir: {args.mask_dir}")
 
-    image_dir_name = getattr(args, 'image_dir', 'images')
-    mask_dir_name = getattr(args, 'mask_dir', 'masks')
-
     pairs = find_image_mask_pairs(
         input_path,
-        image_dir=image_dir_name,
-        mask_dir=mask_dir_name,
+        image_dir=args.image_dir,
+        mask_dir=args.mask_dir,
     )
 
     if not pairs:
         print(f"❌ Error: No image-mask pairs found in {input_path}")
-        print(f"   Looked for images in '{image_dir_name}/' and masks in '{mask_dir_name}/'")
+        print(f"   Looked for images in '{args.image_dir}/' and masks in '{args.mask_dir}/'")
         sys.exit(1)
 
     print(f"   Cases found: {len(pairs)}")

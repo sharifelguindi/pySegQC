@@ -56,7 +56,7 @@ from .pipeline import run_analysis_pipeline
 # Utility functions (merged into parent modules)
 from .visualization import build_hover_text, extract_urls, get_cluster_colors
 from .export import apply_cluster_conditional_formatting, generate_cluster_summary
-from .utils import extract_case_metadata, print_banner
+from .utils import extract_case_metadata, get_case_id, print_banner
 
 __all__ = [
     # Utils
@@ -101,5 +101,6 @@ __all__ = [
     "apply_cluster_conditional_formatting",
     "generate_cluster_summary",
     "extract_case_metadata",
+    "get_case_id",
     "print_banner",
 ]

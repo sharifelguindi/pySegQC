@@ -433,6 +433,28 @@ def get_dashboard_click_handler_script():
 # Metadata Utilities (merged from metadata_utils.py)
 # =============================================================================
 
+def get_case_id(metadata_df: pd.DataFrame, index: int) -> str:
+    """
+    Extract best available case identifier from metadata.
+
+    Checks Case_ID, MRN, and Patient_ID columns in order, falling back
+    to the DataFrame index if none are available.
+
+    Args:
+        metadata_df: DataFrame with case metadata
+        index: Row index to look up
+
+    Returns:
+        String case identifier
+    """
+    for col in ('Case_ID', 'MRN', 'Patient_ID'):
+        if col in metadata_df.columns:
+            val = metadata_df.iloc[index].get(col)
+            if val is not None and pd.notna(val):
+                return str(val)
+    return str(metadata_df.index[index])
+
+
 def extract_case_metadata(
     case_id: int,
     metadata_df: Optional[pd.DataFrame],

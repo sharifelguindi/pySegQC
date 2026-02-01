@@ -171,11 +171,10 @@ class TestGenerateViewerHtml:
         assert 'crosshairWidth: 0' in html
 
     def test_html_contour_mode(self, tmp_path):
-        """Mask is converted to boundary contour via edge detection."""
+        """Mask boundary is extracted via CPU-side 3D edge detection."""
         output = tmp_path / 'viewer.html'
         html = generate_viewer_html(output)
-        assert 'img.slice()' in html
-        assert 'interior' in html
+        assert 'keep[i] = 1' in html
 
     def test_html_zoom_controls(self, tmp_path):
         """Zoom buttons are present."""

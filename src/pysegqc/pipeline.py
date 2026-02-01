@@ -27,7 +27,7 @@ from .visualization import (
     plot_cluster_distance_heatmap,
     plot_selection_quality,
 )
-from .qa import compute_qa_verdicts, create_neutral_qa_results
+from .qa import compute_qa_verdicts
 from .report import generate_html_dashboard, generate_json_report
 from .thumbnail import generate_thumbnails_batch
 from .export import export_results
@@ -172,15 +172,20 @@ def run_analysis_pipeline(args, input_path, output_dir):
     # ─── QA outlier detection ───
     centroids = np.array([pca_data[cluster_labels == k].mean(axis=0) for k in range(n_clusters)])
 
+    qa_sigma = getattr(args, 'qa_sigma', 2.0)
+    qa_contamination = getattr(args, 'qa_contamination', 0.1)
+    qa_results = compute_qa_verdicts(
+        pca_data, cluster_labels, centroids,
+        distance_sigma=qa_sigma, iforest_contamination=qa_contamination
+    )
+
     if getattr(args, 'select_training_cases', False):
-        qa_results = create_neutral_qa_results(pca_data, cluster_labels, centroids)
+        # Training data is assumed clean — override verdicts to all-pass
+        # but keep real per_cluster_stats and iforest_model for prediction reuse
+        qa_results['verdicts'] = np.array(['pass'] * len(pca_data), dtype=object)
+        qa_results['qa_risk_scores'] = np.zeros(len(pca_data))
+        logger.info("Training mode — all cases marked pass (QA stats saved for prediction)")
     else:
-        qa_sigma = getattr(args, 'qa_sigma', 2.0)
-        qa_contamination = getattr(args, 'qa_contamination', 0.1)
-        qa_results = compute_qa_verdicts(
-            pca_data, cluster_labels, centroids,
-            distance_sigma=qa_sigma, iforest_contamination=qa_contamination
-        )
         logger.info(
             f"QA verdicts: {np.sum(qa_results['verdicts'] == 'pass')} pass, "
             f"{np.sum(qa_results['verdicts'] == 'review')} review, "

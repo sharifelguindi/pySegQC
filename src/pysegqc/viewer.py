@@ -15,17 +15,9 @@ from typing import Any, Dict, Optional
 import numpy as np
 import pandas as pd
 
+from .utils import get_case_id as _get_case_id
+
 logger = logging.getLogger(__name__)
-
-
-def _get_case_id(metadata_df: pd.DataFrame, index: int) -> str:
-    """Extract best available case identifier from metadata."""
-    for col in ('Case_ID', 'MRN', 'Patient_ID'):
-        if col in metadata_df.columns:
-            val = metadata_df.iloc[index].get(col)
-            if val is not None and pd.notna(val):
-                return str(val)
-    return str(metadata_df.index[index])
 
 
 def generate_viewer_data(
@@ -224,11 +216,11 @@ _VIEWER_TEMPLATE = r'''<!DOCTYPE html>
         <button onclick="setWL(40,80)" id="wl-brain">Brain</button>
         <button onclick="setWL(400,2000)" id="wl-bone">Bone</button>
         <button onclick="setWL(-600,1500)" id="wl-lung">Lung</button>
-        <button onclick="setWL(50,350)" id="wl-soft-tissue">Soft Tissue</button>
+        <button onclick="setWL(30,400)" id="wl-soft-tissue">Soft Tissue</button>
       </div>
       <div class="wl-inputs">
-        <label>L</label><input id="wl-level" type="number" value="50">
-        <label>W</label><input id="wl-width" type="number" value="350">
+        <label>L</label><input id="wl-level" type="number" value="30">
+        <label>W</label><input id="wl-width" type="number" value="400">
         <button class="wl-presets" style="margin:0;" onclick="applyCustomWL()">Apply</button>
       </div>
     </div>
@@ -275,10 +267,10 @@ async function init() {
   // Load NiiVue from CDN with fallback
   let Niivue;
   try {
-    ({ Niivue } = await import("https://cdn.jsdelivr.net/npm/@niivue/niivue@0.44.0/dist/index.js"));
+    ({ Niivue } = await import("https://cdn.jsdelivr.net/npm/@niivue/niivue@0.65.0/dist/index.js"));
   } catch {
     try {
-      ({ Niivue } = await import("https://unpkg.com/@niivue/niivue@0.44.0/dist/index.js"));
+      ({ Niivue } = await import("https://unpkg.com/@niivue/niivue@0.65.0/dist/index.js"));
     } catch {
       setStatus('Failed to load NiiVue library. Check your internet connection.');
       return;
@@ -321,12 +313,14 @@ async function init() {
   currentIdx = cases.findIndex(c => c.index === startCase);
   if (currentIdx < 0) currentIdx = 0;
 
-  // Initialize NiiVue — multiplanar (axial + coronal + sagittal)
+  // Initialize NiiVue — multiplanar 2x2 grid (axial + coronal + sagittal + render)
   nv = new Niivue({
     backColor: [0.08, 0.08, 0.1, 1],
     show3Dcrosshair: false,
     crosshairWidth: 0,
     multiplanarForceRender: true,
+    multiplanarLayout: 2,
+    yoke3Dto2DZoom: true,
     sliceType: 3,
   });
   nv.attachToCanvas(document.getElementById('gl-canvas'));
@@ -375,46 +369,44 @@ async function loadCase(idx) {
     if (maskUrl) {
       volumes.push({
         url: maskUrl,
-        colormap: 'actc',
+        colormap: 'red',
         opacity: 1.0,
       });
     }
     await nv.loadVolumes(volumes);
-    // Zero out non-target voxels so only the reviewed structure is visible
+    // Binarize mask to target structure, then extract 3D boundary (contour)
     const label = viewerData && viewerData.structure_label;
-    if (label != null && nv.volumes.length > 1) {
-      const img = nv.volumes[1].img;
-      for (let i = 0; i < img.length; i++) {
-        if (Math.round(img[i]) !== label) img[i] = 0;
-      }
-    }
-    // Convert solid mask to contour (keep only boundary voxels)
     if (nv.volumes.length > 1) {
-      const vol = nv.volumes[1];
-      const img = vol.img;
-      const nx = vol.hdr.dims[1], ny = vol.hdr.dims[2], nz = vol.hdr.dims[3];
-      if (nx * ny * nz === img.length) {
-        const src = img.slice();
-        for (let z = 0; z < nz; z++) {
-          for (let y = 0; y < ny; y++) {
-            for (let x = 0; x < nx; x++) {
-              const idx = x + y * nx + z * nx * ny;
-              if (src[idx] === 0) continue;
-              const v = src[idx];
-              const interior =
-                (x > 0 && src[idx-1] === v) &&
-                (x < nx-1 && src[idx+1] === v) &&
-                (y > 0 && src[idx-nx] === v) &&
-                (y < ny-1 && src[idx+nx] === v) &&
-                (z > 0 && src[idx-nx*ny] === v) &&
-                (z < nz-1 && src[idx+nx*ny] === v);
-              if (interior) img[idx] = 0;
+      const img = nv.volumes[1].img;
+      const hdr = nv.volumes[1].hdr;
+      const nx = hdr.dims[1], ny = hdr.dims[2], nz = hdr.dims[3];
+      const nxy = nx * ny;
+      // Binarize: keep only the target label
+      for (let i = 0; i < img.length; i++) {
+        img[i] = (label != null && Math.round(img[i]) === label) ? 1 : 0;
+      }
+      // 3D boundary detection: keep voxels with at least one zero face-neighbor
+      const keep = new Uint8Array(img.length);
+      for (let z = 0; z < nz; z++) {
+        for (let y = 0; y < ny; y++) {
+          for (let x = 0; x < nx; x++) {
+            const i = x + y * nx + z * nxy;
+            if (img[i] === 0) continue;
+            if (x === 0 || x === nx-1 || y === 0 || y === ny-1 || z === 0 || z === nz-1 ||
+                img[i-1] === 0 || img[i+1] === 0 ||
+                img[i-nx] === 0 || img[i+nx] === 0 ||
+                img[i-nxy] === 0 || img[i+nxy] === 0) {
+              keep[i] = 1;
             }
           }
         }
       }
-      nv.updateGLVolume();
+      for (let i = 0; i < img.length; i++) img[i] = keep[i];
+      // Fix colormap range so value 1 maps to full brightness
+      nv.volumes[1].cal_min = 0;
+      nv.volumes[1].cal_max = 1;
     }
+    nv.updateGLVolume();
     // Preserve W/L across case navigation
     const wlL = parseFloat(document.getElementById('wl-level').value);
     const wlW = parseFloat(document.getElementById('wl-width').value);
@@ -474,7 +466,7 @@ document.addEventListener('keydown', (e) => {
     case '1': setWL(40, 80); break;
     case '2': setWL(400, 2000); break;
     case '3': setWL(-600, 1500); break;
-    case '4': setWL(50, 350); break;
+    case '4': setWL(30, 400); break;
   }
 });
 

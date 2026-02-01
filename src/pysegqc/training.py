@@ -11,12 +11,12 @@ import numpy as np
 import pandas as pd
 from scipy.spatial.distance import euclidean
 from sklearn.cluster import AgglomerativeClustering
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
+from sklearn.impute import SimpleImputer
 from sklearn.metrics import silhouette_score
+from sklearn.preprocessing import StandardScaler
 
 from .data_loader import load_and_preprocess_data
-from .utils import detect_structure_positions
+from .utils import detect_structure_positions, extract_case_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -304,21 +304,7 @@ def select_training_cases_from_clustering(cluster_labels, pca_data, metadata_df,
         for idx in selected_idx:
             dist = distance_df[distance_df['sample_idx'] == idx]['distance'].values[0]
 
-            # Extract metadata for this case
-            case_metadata = {'Case_ID': idx}
-            if metadata_df is not None and idx in metadata_df.index:
-                if 'MRN' in metadata_df.columns:
-                    case_metadata['MRN'] = metadata_df.loc[idx, 'MRN']
-                if 'Plan_ID' in metadata_df.columns:
-                    case_metadata['Plan_ID'] = metadata_df.loc[idx, 'Plan_ID']
-                if 'Session_ID' in metadata_df.columns:
-                    case_metadata['Session_ID'] = metadata_df.loc[idx, 'Session_ID']
-                if 'View_Scan_URL' in metadata_df.columns:
-                    case_metadata['View_Scan_URL'] = metadata_df.loc[idx, 'View_Scan_URL']
-                if 'All_Structure_Names' in metadata_df.columns:
-                    case_metadata['All_Structure_Names'] = metadata_df.loc[idx, 'All_Structure_Names']
-                if 'Structure_Name' in metadata_df.columns:
-                    case_metadata['Structure_Name'] = metadata_df.loc[idx, 'Structure_Name']
+            case_metadata = extract_case_metadata(idx, metadata_df)
 
             case_metadata['Distance_From_Centroid'] = float(dist)
             case_details[idx] = case_metadata
@@ -397,7 +383,6 @@ def select_multi_structure_training_cases(excel_path, sheet_name='PCA_Data', imp
 
     # Detect structure positions from ORIGINAL feature columns
     # Need to read the Excel directly to get original column names
-    import pandas as pd
     df_original = pd.read_excel(excel_path, sheet_name=sheet_name)
     feature_pattern = re.compile(r'^\d{3}_')
     original_feature_cols = [col for col in df_original.columns if feature_pattern.match(str(col))]
